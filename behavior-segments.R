@@ -1,6 +1,6 @@
 rm(list=lsf.str())
 
-setwd("C:\\Users\\NK-1\\Documents\\GitHub\\behavior-segments-pl-gorod")
+setwd("C:\\Users\\NK-1\\Documents\\GitHub\\loyalty_program_Gorod")
 
 # open files, format, rename and filter
 library(rio)
@@ -28,8 +28,6 @@ client_list <- client_list %>%
 
 fraud <- fraud %>%
   rename(userid='User.ID')
-
-names(master_list1)
 
 master_list <- master_list1 %>%
   rename(userid='User.ID',
@@ -83,7 +81,7 @@ all_tab_withoutna[is.na(all_tab_withoutna)] <- 0
 # create segments
 visits_group <- all_tab_withoutna  %>%
   group_by(sessions_in_web, sessions_in_app) %>%
-  summarise(users=n(),
+  summarise(users=length(unique(userid)),
             users_with_trans=sum(users_with_trans),
             avg_sessions_total=sum(sessions_in_web+sessions_in_app)/sum(users),
             avg_bill=sum(sum_trans)/sum(qt_trans),
@@ -95,17 +93,17 @@ visits_group <- all_tab_withoutna  %>%
             level=mean(level))
 
 set.seed(123)
-visits_group$segments <- kmeans(visits_group[,c('sessions_in_web', 'avg_sessions_total', 'sessions_in_app')], 7, nstart = 30)$cluster
+visits_group$segments <- kmeans(visits_group[,c('sessions_in_web', 'sessions_in_app')], 7, nstart = 30)$cluster
 
 visits_group$segments[visits_group$sessions_in_web==0 & visits_group$sessions_in_app==0] <- '0 visits'
 visits_group$segments[visits_group$sessions_in_web==0 & visits_group$sessions_in_app==1] <- '1 visit'
 visits_group$segments[visits_group$sessions_in_web==1 & visits_group$sessions_in_app==0] <- '1 visit'
-visits_group$segments[visits_group$segments==4 | visits_group$segments==6] <- 'App++'
-visits_group$segments[visits_group$segments==5] <- 'Web++'
-visits_group$segments[visits_group$segments==3 ] <- 'App+'
-visits_group$segments[visits_group$segments==2 ] <- 'Web+'
-visits_group$segments[visits_group$segments==7 ] <- 'Web++ App ++'
-visits_group$segments[visits_group$segments==1 ] <- 'Some visits'
+visits_group$segments[visits_group$segments==4 | visits_group$segments==1] <- 'App++'
+visits_group$segments[visits_group$segments==2] <- 'Web++'
+visits_group$segments[visits_group$segments==7 ] <- 'App+'
+visits_group$segments[visits_group$segments==3 ] <- 'Web+'
+visits_group$segments[visits_group$segments==6 ] <- 'Web++ App ++'
+visits_group$segments[visits_group$segments==5 ] <- 'Some visits'
 
 sapply(split(visits_group[,c(1,2)], visits_group$segments), colMeans) ## среднее значение по сегментам
 
@@ -133,7 +131,7 @@ calc_data <- merge(all_tab_withoutna,
 
 segment_tab <- calc_data %>%
   group_by(segments) %>%
-  summarise(users=n(),
+  summarise(users=length(unique(userid)),
             users_with_trans=length(unique(userid[qt_trans>0])),
             avg_sessions_total=sum(sessions_in_web+sessions_in_app)/sum(users),
             avg_sessions_in_web=sum(sessions_in_web)/sum(users),
@@ -149,6 +147,7 @@ segment_tab <- calc_data %>%
             qt_trans=sum(qt_trans))
 
 segment_tab$segments <- as.factor(segment_tab$segments)
+
 
 # build plots 
 ## 1
@@ -242,31 +241,34 @@ library(reshape2)
 segment_melt <- melt(segment_tab)
 serment_melt_cut <- segment_melt[segment_melt$variable %in% c('share_dec_bon', 'rate_inc_bon', 'rate_inc_bon_par', 'delta_rates'),]
 levels(serment_melt_cut$variable)[c(8,9,10,11)] <- 
-  c('Доля списания от суммы покупки', 'Ср. % начисления партнерами', 'Ср. % начисления пользователям', 'Разница в %% начисления')
+  c('Доля списания от суммы покупки', 'Ср. % начисления партнерами', 
+    'Ср. % начисления пользователям', 'Маржа')
 
 serment_melt_lev <- segment_melt[segment_melt$variable %in% c('level'),]
 levels(serment_melt_lev$variable)[12] <- 
-  c('Уровень')
+  c('Уровень пользователя')
 
 normalizer <- max(serment_melt_cut$value) / max(serment_melt_lev$value)
 
 g4_a <- ggplot(data=serment_melt_cut, 
-               aes(x=factor(serment_melt_cut$segments, levels(serment_melt_cut$segments)[c(1,4,5,2,6,3,7)]), 
+               aes(x=factor(serment_melt_cut$segments, levels(serment_melt_cut$segments)), 
                    y=value/normalizer, fill=variable))+
   geom_col(position = "dodge", width=.7) +
+  
   geom_text(aes(label = paste0(round(value*100,digits=1),"%"),
                 y= value/normalizer), stat="identity", position = position_dodge(width=.7),
             vjust = -.3, size=3) + 
+
   geom_line(data = serment_melt_lev, 
             size=1.3,
-            color='#996600',
+            color='#FF6633',
             aes(x=segments, y=value, group = 1)) +
   geom_text(data = serment_melt_lev, aes(x=segments, y=value, group = 1, 
-                                         label = round(value,1),
-                                         vjust = -.4),
-            size=3) +
+                                         label = round(value,1)), size=3, vjust = -.4) +
+  
+  
   scale_y_continuous(sec.axis = sec_axis(trans= ~.*normalizer,
-                                         name = 'Уровень')) +
+                                         name = 'Уровень пользователя')) +
   theme_classic() +
   theme(axis.text.y=element_blank(),
         axis.ticks.y=element_blank()) + 
@@ -276,7 +278,6 @@ g4_a <- ggplot(data=serment_melt_cut,
        fill='Показатель')
 
 # merge all data with partners categories and build plots by partners categories
-
 partner_cat <- partner_cat1 
 calc_data_advanced <- merge(calc_data, partner_cat, all.x=T, by.x=c('ID.ТСП'), 
                             by.y = c('Partner.ID'))
@@ -352,6 +353,54 @@ p2 <- ggplot(calc_part_data_procent,
             position = position_stack(vjust = 0.5),
             size=2.5) 
 
+# build plots
+calc_data_advanced$client_type <- as.factor(calc_data_advanced$client_type)
+
+calc_type_data <- calc_data_advanced %>%
+  group_by(client_type, segments) %>%
+  summarise(users=length(unique(userid)),
+            avg_sessions_total=sum(sessions_in_web+sessions_in_app)/sum(users),
+            avg_sessions_in_web=sum(sessions_in_web)/sum(users),
+            avg_sessions_in_app=sum(sessions_in_app)/sum(users),
+            avg_bill=sum(sum_trans)/sum(qt_trans),
+            avg_trans_per_user=sum(qt_trans)/sum(users_with_trans),
+            share_dec_bon=mean(share_dec_bon),
+            rate_inc_bon_par=mean(rate_inc_bon_par),
+            rate_inc_bon=mean(rate_inc_bon),
+            delta_rates=rate_inc_bon_par-rate_inc_bon,
+            level=mean(level),
+            sum_trans=sum(sum_trans),
+            users_with_trans=length(unique(userid[qt_trans>0])),
+            qt_trans=sum(qt_trans))
+
+
+calc_type_data_full <- merge(calc_type_data, segment_tab, all.x = T, by = c('segments'))
+
+calc_type_procent <- mutate(calc_type_data_full,
+                                 sum_trans=sum_trans.x/sum_trans.y,
+                                 users_with_trans=users_with_trans.x/users_with_trans.y,
+                                 users=users.x/users.y,
+                                 qt_trans=qt_trans.x/qt_trans.y)
+
+##
+p3 <- ggplot(calc_type_procent, 
+             aes(x = "", y=users, fill=client_type))  + 
+  geom_bar(width = 1, stat = "identity") +
+  theme(axis.line = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(), 
+        plot.title = element_text(hjust=0.5)) + 
+  labs(fill="Источник регистрации", 
+       x=NULL, 
+       y=NULL, 
+       title="Распределение пользователей по источникам регистрации") + facet_wrap(segments~.)  + coord_polar(theta = "y", start=0,
+                                                                              direction = -1, clip='off') + 
+  geom_text(aes(label=ifelse(users>0.05,paste0(round(users*100,1),'%'),
+                             ''),
+                y=users),
+            position = position_stack(vjust = 0.5),
+            size=2.5) 
+
 ## see users on plot by type of registration
 visits_group_c <- calc_data_advanced  %>%
   group_by(sessions_in_web, sessions_in_app, client_type, segments) %>%
@@ -366,24 +415,22 @@ visits_group_c <- calc_data_advanced  %>%
             delta_rates=rate_inc_bon_par-rate_inc_bon,
             level=mean(level))
 
-visits_group_c <- as.data.frame(visits_group_c)
 visits_group_c$client_type <- as.factor(visits_group_c$client_type)
 levels(visits_group_c$client_type) <- c('App', 'App', 'Web')
 
 visits_group_plot <- ggplot(data=visits_group_c, 
                             aes(sessions_in_web, sessions_in_app, 
-                                color = as.factor(client_type))) + 
+                                color = as.factor(segments),
+                                size=100)) + 
   geom_point() + theme_classic() +
   labs(title = "Сегменты по посещаемости сайта и приложений",
        y = "Количество посещений APP",
        x = "Количество посещений WEB",
        color='Сегменты',
-       size='Количество посещений. всего')+ facet_wrap(client_type+segments~.)
-
-visits_group_plot 
+       size='Количество посещений. всего')+ facet_wrap(client_type~.)
 
 ## all plots again
-visits_group_p
+visits_group_p + scale_color_brewer(palette = 'Set2', direction=1)
 
 g1 + scale_fill_manual(values=c("#996600", "#CCCC66", "#669900", "#FFCC00", "#CC6600", 
                                 "#CC9933", "#666633"))
@@ -395,20 +442,24 @@ g3 + scale_fill_manual(values=c("#996600", "#CCCC66", "#669900", "#FFCC00", "#CC
                                 "#CC9933", "#666633"))
 
 g4 + scale_fill_manual(values=c("#996600", "#CCCC66", "#669900", "#FFCC00", "#CC6600", 
-                                "#CC9933", "#666633"))
+                                "#CC9933", "#CC6600"))
 
 g4_u + scale_fill_manual(values=c("#996600", "#CCCC66", "#669900", "#FFCC00", "#CC6600", 
                                   "#CC9933", "#666633"))
 
-g4_a + scale_fill_manual(values=c("#996600", "#CCCC66", "#669900", "#FFCC00", "#CC6600", 
+g4_a + scale_fill_manual(values=c("#996600", "#CCCC66", "#669900", "#FFCC00", "#FF6633", 
                                   "#CC9933", "#666633"))
 
 p1 + scale_fill_brewer(palette = 'Spectral') ##RdYlGn
 
 p2 + scale_fill_brewer(palette = 'Spectral') ##RdYlGn
 
+p3 + scale_fill_brewer(palette = 'Set2', direction = -1)
 
-## cluster plot (don't use on presentation)
+
+## don't use on presentation
+visits_group_plot + scale_color_brewer(palette = 'Set2', direction=-1)
+
 library(factoextra)
 fviz_cluster(kmeans(all_tab_withoutna[,c('sessions_in_web', 'sessions_in_app')], 7, nstart = 30),
              data = all_tab_withoutna[,c('sessions_in_web', 'sessions_in_app')]) ##cluster plot
