@@ -1,1 +1,1 @@
-# loyalty_program_Gorod
+# hello, world
