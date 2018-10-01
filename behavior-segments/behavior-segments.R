@@ -2,7 +2,7 @@
 ## скопировать точные шрифты из файла rmd !!!!
 rm(list=lsf.str())
 
-setwd("C:\\Users\\NK-1\\Documents\\GitHub\\loyalty_program_Gorod\\behavior-segments")
+setwd("C:\\Users\\NK-1\\Documents\\GitHub\\data-behavior-segments")
 
 # open files, format, rename and filter
 library(rio)
