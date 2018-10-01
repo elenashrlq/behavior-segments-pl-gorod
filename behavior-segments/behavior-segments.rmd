@@ -1,13 +1,42 @@
+---
+title: "Сегменты пользователей по посещаемости"
+date: '*Период: 4авг. –  3сен.*.'
+output: 
+  word_document:
+  fig_width: 6
+  fig_height: 4
+reference_docx: my-styles.docx
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, fig.width=8, fig.height=4)
+```
+
+*Исключены пользователи, замеченные во фроде и посещения с IP адресов офиса. Транзакции учитываются только по партнерам*
+
+## Описание сегментов
+В зависимости посещаемости сайтов и приложений можно выделить 7 сегментов зарегистрированных пользователей:
+
++ **0 visits** – не было посещений;
++ **Some visits** – у пользователя незначительно кол-во посещений (в среднем 6 визитов на сайте и 9 визитов в МП);
++ **App+** – пользователь посещал преимущественно приложения (в среднем – 33 визита в МП);
++ **App++** – пользователь посещал преимущественно приложения (в среднем – 66 визитов МП);
++ **Web+** – в посещениях пользователя много визитов на сайт (в среднем – 32 визита на сайте);
++ **Web++** – в посещениях пользователя еще больше визитов на сайт (в среднем – 71 визит на сайте);
++ **Web++** – два пользователя с рекордными суммарными посещениями сайта и приложения (в среднем 128 визита на сайте и 132 – в МП).
+
+###Резюме
+Чем больше пользователь посещает ресурсы ПЛ «Город» в интернете, тем больше вероятность совершения транзакции (и наоборот).
+
+```{r code, warning=FALSE, message=FALSE, results='hide'}
 rm(list=lsf.str())
 
-setwd("C:\\Users\\NK-1\\Documents\\GitHub\\loyalty_program_Gorod")
+setwd("C:\\Users\\NK-1\\Documents\\GitHub\\loyalty_program_Gorod\\behavior-segments")
 
 # open files, format, rename and filter
 library(rio)
 convert("transactions-data.xlsx", "transactions-data.csv")
 convert("fraud-data.xlsx", "fraud-data.csv")
-convert("partners_directory.xlsx", "partners_directory.csv")
-
 
 client_list <- read.csv("client-data.csv", encoding = "UTF-8", stringsAsFactors = FALSE, sep = ';')
 master_list1 <- read.csv("transactions-data.csv", stringsAsFactors = FALSE,  encoding = "UTF-8")
@@ -120,9 +149,6 @@ visits_group_p <- ggplot(visits_group,
        color='Сегменты',
        size='Количество посещений. всего')
   
-visits_group_p 
-
-
 # merge all data with segment group all data by segments for plots
 calc_data <- merge(all_tab_withoutna, 
                    visits_group[,c('sessions_in_web', 'sessions_in_app','avg_sessions_total', 'segments')],
@@ -264,14 +290,15 @@ g4_a <- ggplot(data=serment_melt_cut,
             color='#FF6633',
             aes(x=segments, y=value, group = 1)) +
   geom_text(data = serment_melt_lev, aes(x=segments, y=value, group = 1, 
-                                         label = round(value,1)), size=3, vjust = -.4) +
+                                         label = round(value,1)), size=3.5, vjust = -.4) +
   
   
   scale_y_continuous(sec.axis = sec_axis(trans= ~.*normalizer,
                                          name = 'Уровень пользователя')) +
   theme_classic() +
   theme(axis.text.y=element_blank(),
-        axis.ticks.y=element_blank()) + 
+        axis.ticks.y=element_blank(),
+        legend.position="bottom") + 
   labs(title = "Проценты списания и начисления",
        y = "Процент,%",
        x = "Сегменты",
@@ -332,7 +359,7 @@ p1 <- ggplot(calc_part_data_procent,
                              ''),
                 y=sum_trans),
             position = position_stack(vjust = 0.4),
-            size=2.5) 
+            size=3.5) 
   
 ##
 p2 <- ggplot(calc_part_data_procent, 
@@ -351,7 +378,7 @@ p2 <- ggplot(calc_part_data_procent,
                              ''),
                 y=qt_trans),
             position = position_stack(vjust = 0.5),
-            size=2.5) 
+            size=3.5) 
 
 # build plots
 calc_data_advanced$client_type <- as.factor(calc_data_advanced$client_type)
@@ -399,7 +426,7 @@ p3 <- ggplot(calc_type_procent,
                              ''),
                 y=users),
             position = position_stack(vjust = 0.5),
-            size=2.5) 
+            size=3.5) 
 
 ## see users on plot by type of registration
 visits_group_c <- calc_data_advanced  %>%
@@ -418,50 +445,130 @@ visits_group_c <- calc_data_advanced  %>%
 visits_group_c$client_type <- as.factor(visits_group_c$client_type)
 levels(visits_group_c$client_type) <- c('App', 'App', 'Web')
 
-visits_group_plot <- ggplot(data=visits_group_c, 
-                            aes(sessions_in_web, sessions_in_app, 
-                                color = as.factor(segments),
-                                size=100)) + 
-  geom_point() + theme_classic() +
+visits_group_p <- ggplot(visits_group, 
+                         aes(sessions_in_web, sessions_in_app, 
+                             color = as.factor(segments))) + 
+  geom_point(size=5) + theme_classic() +
   labs(title = "Сегменты по посещаемости сайта и приложений",
        y = "Количество посещений APP",
        x = "Количество посещений WEB",
-       color='Сегменты',
-       size='Количество посещений. всего')+ facet_wrap(client_type~.)
+       color='Сегменты')
+```
 
-## all plots again
+
+```{r segments_plot, echo=FALSE}
 visits_group_p + scale_color_brewer(palette = 'Set2', direction=1)
+```
 
-g1 + scale_fill_manual(values=c("#996600", "#CCCC66", "#669900", "#FFCC00", "#CC6600", 
-                                "#CC9933", "#666633"))
+### Комментарии к диаграмме
 
-g2 + scale_fill_manual(values=c("#996600", "#CCCC66", "#669900", "#FFCC00", "#CC6600", 
-                                "#CC9933", "#666633"))
++ Точки на диаграмме - это пользователи. 
++ Чем **правее** они расположены, тем больше посещений сайта у этих пользователей.
++ Чем **выше** они расположены, тем больше посещений приложений у этих пользователей.
 
-g3 + scale_fill_manual(values=c("#996600", "#CCCC66", "#669900", "#FFCC00", "#CC6600", 
-                                "#CC9933", "#666633"))
+##### 
 
+##Размер сегментов особенности
+
+### Выводы:
++ Повторных посещений веб-сайта значительно меньше, чем повторных посещений приложений (298 пользователей **App+** против 38 человек **Web+** и 110 пользователей **App++** против 12 – **Web++**).
+
++ Более 3,5 тыс. пользователей сегмента **Some visits** – те, у кого было мало посещений, и их сложно однозначно отнести к сегментам активных пользователей и выявить в их поведении отличия.
+
++ В сегмент **Web++ App++** попало только 2 пользователя, однако он выделен в отдельную группу из-за значительно отличающихся транзакционных показателей (так называемые «выбросы»).
+
+```{r segments_size, echo=FALSE}
 g4 + scale_fill_manual(values=c("#996600", "#CCCC66", "#669900", "#FFCC00", "#CC6600", 
                                 "#CC9933", "#CC6600"))
 
+```
+
+##Распределение пользователей в сегментах по источнику регистрации
+### Выводы
++ Пользователи, зарегистрировавшиеся через сайт, продолжают заходить в проект как через сайт, так и через мобильное приложение;
+
++ Пользователи, зарегистрировавшиеся через приложение, преимущественно продолжают использовать приложение. В целом они меньше возвращаются в онлайн:
+
+
+```{r type_registration, echo=FALSE, fig.width=9, fig.height=7}
+p3 + scale_fill_brewer(palette = 'Set2', direction = -1)
+
+```
+
+## Транзакционные показатели по сегментам пользователей
+### Выводы
++ Наиболее заметна корреляция сегментов и **доли пользователей с транзакциями** (от всех пользователей в сегменте) – чем больше пользователь посещает ресурсы ПЛ «Город» в интернете, тем больше вероятность совершения транзакции (и наоборот):
+
+```{r share_users_with_trans, echo=FALSE}
 g4_u + scale_fill_manual(values=c("#996600", "#CCCC66", "#669900", "#FFCC00", "#CC6600", 
                                   "#CC9933", "#666633"))
 
+```
+
++ В качестве гипотезы можно предположить наличие корреляции сегментов со **ср. кол-вом транзакций** на пользователя (есть тенденция, но не очень явная):
+
+```{r avg_trans, echo=FALSE}
+g2 + scale_fill_manual(values=c("#996600", "#CCCC66", "#669900", "#FFCC00", "#CC6600", 
+                                "#CC9933", "#666633"))
+
+
+```
+
++ Данных по среднему чеку и ср. % списания пользователей от суммы покупки пока недостаточно для выводов: 
+
+```{r avg_bill, echo=FALSE}
+g1 + scale_fill_manual(values=c("#996600", "#CCCC66", "#669900", "#FFCC00", "#CC6600", 
+                                "#CC9933", "#666633"))
+
+```
+
+```{r procent, echo=FALSE}
+g3 + scale_fill_manual(values=c("#996600", "#CCCC66", "#669900", "#FFCC00", "#CC6600", 
+                                "#CC9933", "#666633"))
+
+```
+
++ Более активные по посещаемости пользователи в целом имеют более высокий **уровень в программе**: 
+
+```{r levels, echo=FALSE, fig.width=11, fig.height=6}
 g4_a + scale_fill_manual(values=c("#996600", "#CCCC66", "#669900", "#FFCC00", "#FF6633", 
                                   "#CC9933", "#666633"))
 
+```
+
+## Покупки пользователей в зависимости от категории партнера
+
++ По количеству транзакций и сумме покупок в ТОП-3 всех сегментов входит категория **«Красота и здоровье»**. Однако у пользователей мобильных приложений такая доля выше, чем у посетителей сайта.
+
++ **Admitad** также входит в ТОП-3, но только у тех пользователей, кто посещает онлайн-ресурсы ПЛ «Город».
+
++ Категория **«Продукты»** привлекает наоборот пользователей, которые чаще используют сайт.
+
++ Общая сумма покупок в **Admitad** также выше также у посетителей сайта.
+
++ В **кафе и рестораны** ходят чаще оффлайн-пользователи, а покупки в категории **«Дом, дача и ремонт»** более актуальны для пользователей моб. приложений.
+
+
+```{r sum_trans, echo=FALSE, warning=F, fig.width=9, fig.height=7}
 p1 + scale_fill_brewer(palette = 'Spectral') ##RdYlGn
 
+```
+
+```{r qt_trans, echo=FALSE, warning=F, fig.width=9, fig.height=7}
 p2 + scale_fill_brewer(palette = 'Spectral') ##RdYlGn
 
-p3 + scale_fill_brewer(palette = 'Set2', direction = -1)
+```
 
 
-## don't use on presentation
-visits_group_plot + scale_color_brewer(palette = 'Set2', direction=-1)
+### Спасибо!
 
-library(factoextra)
-fviz_cluster(kmeans(all_tab_withoutna[,c('sessions_in_web', 'sessions_in_app')], 7, nstart = 30),
-             data = all_tab_withoutna[,c('sessions_in_web', 'sessions_in_app')]) ##cluster plot
 
-## all colors http://websitetips.com/colorcharts/visibone/hex/
+
+
+
+
+
+
+
+
+
