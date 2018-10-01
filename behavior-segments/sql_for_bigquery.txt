@@ -1,0 +1,29 @@
+SELECT web_bq.userid, sessions_in_app, sessions_in_web
+
+FROM
+
+(SELECT user_id as userid, count( * ) as sessions_in_app
+FROM 
+TABLE_DATE_RANGE(                  [gorod-88916:analytics_151524607.events_],
+                                   TIMESTAMP('2018-08-04'),
+                                   TIMESTAMP('2018-09-03')
+                                   )
+WHERE event_name='session_start'
+GROUP BY userid) as app_bq
+
+
+    JOIN EACH
+
+    (SELECT user.id as userid, count(distinct( sessionId )) as sessions_in_web
+    FROM 
+    TABLE_DATE_RANGE(
+                                       [our-hull-207115:OWOXBI_Streaming.session_streaming_],
+                                       TIMESTAMP('2018-08-04'),
+                                       TIMESTAMP('2018-09-03'))
+    WHERE hits.device.ip!="94.243.131.187" AND hits.device.ip!="94.243.131.186" AND hits.device.ip!='35.205.217.74' AND hits.page.hostname !='dev.gorodtroika.xor.services' AND hits.page.hostname !='localhost'
+    GROUP BY userid 
+    ORDER BY sessions_in_web desc) as web_bq
+
+    ON   web_bq.userid=app_bq.userid
+    GROUP BY web_bq.userid, sessions_in_app, sessions_in_web
+    ORDER BY sessions_in_app desc
